@@ -16,9 +16,10 @@ h1{font:600 20px/1.25 Georgia,serif;margin:4px 0 0;text-wrap:balance}
 .act{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 button,a.b{display:inline-flex;align-items:center;height:36px;padding:0 14px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--ink);font:600 13.5px inherit;font-family:inherit;cursor:pointer;text-decoration:none;white-space:nowrap}
 button.pri{background:var(--c);border-color:var(--c);color:#fff}
+#sound[hidden]{display:none}
 .stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
 .ratio{position:relative;width:100%;max-height:100%;aspect-ratio:16/9;max-width:calc((100vh - 120px) * 16 / 9);background:#000;border-radius:4px;overflow:hidden}
-iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.ratio iframe,#yt{position:absolute;inset:0;width:100%;height:100%;border:0}
 .empty{color:var(--ink2);text-align:center}
 @media (max-width:640px){header{flex-direction:column}.act{justify-content:flex-start}}
 </style>
@@ -28,12 +29,13 @@ iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
   <header>
     <div><div class="k" id="meta">IA Learning Path</div><h1 id="ttl">Reproductor de clips</h1></div>
     <div class="act">
-      <button type="button" class="pri" id="again">Repetir tramo</button>
+      <button type="button" class="pri" id="sound" hidden>Activar sonido</button>
+      <button type="button" id="again">Repetir tramo</button>
       <button type="button" id="full">Pantalla completa</button>
-      <a class="b" id="yt" href="#" target="_blank" rel="noopener">Abrir en YouTube</a>
+      <a class="b" id="ytl" href="#" target="_blank" rel="noopener">Abrir en YouTube</a>
     </div>
   </header>
-  <div class="stage"><div class="ratio" id="box"><p class="empty" id="msg">Abre un clip desde la formación.</p></div></div>
+  <div class="stage"><div class="ratio" id="box"><div id="yt"><p class="empty">Abre un clip desde la formación.</p></div></div></div>
 </div>
 <script>
 const q=new URLSearchParams(location.hash.slice(1));
@@ -42,22 +44,32 @@ const s=Math.max(0,parseInt(q.get("s")||"0",10)||0);
 const e=Math.max(0,parseInt(q.get("e")||"0",10)||0);
 const t=q.get("t")||"";const c=q.get("c")||"";
 const fmt=x=>{const h=Math.floor(x/3600),m=Math.floor(x%3600/60),r=x%60;return (h?h+":"+String(m).padStart(2,"0"):m)+":"+String(r).padStart(2,"0")};
-function load(){
-  if(!id)return;
-  const src="https://www.youtube-nocookie.com/embed/"+id+"?start="+s+(e>s?"&end="+e:"")+"&autoplay=1&rel=0&modestbranding=1&playsinline=1";
-  const f=document.createElement("iframe");
-  f.src=src;f.title=t||"Vídeo";f.referrerPolicy="strict-origin-when-cross-origin";
-  f.allow="autoplay; encrypted-media; picture-in-picture; fullscreen";f.allowFullscreen=true;
-  const box=document.getElementById("box");box.textContent="";box.appendChild(f);
-}
+const soundBtn=document.getElementById("sound");
+let P=null,started=false;
+function unmute(){if(P&&P.isMuted&&P.isMuted()){P.unMute();P.setVolume(100)}soundBtn.hidden=true}
+function play(){if(!P)return;P.loadVideoById({videoId:id,startSeconds:s,endSeconds:e>s?e:undefined})}
+window.onYouTubeIframeAPIReady=function(){
+  P=new YT.Player("yt",{host:"https://www.youtube-nocookie.com",videoId:id,
+    playerVars:{autoplay:1,start:s,end:e>s?e:undefined,rel:0,modestbranding:1,playsinline:1,origin:location.origin},
+    events:{
+      onReady:ev=>{ev.target.playVideo();
+        // Si el navegador no deja empezar con sonido, empieza en silencio y deja el botón para activarlo.
+        setTimeout(()=>{if(!started){ev.target.mute();ev.target.playVideo();soundBtn.hidden=false}},1200)},
+      onStateChange:ev=>{if(ev.data===YT.PlayerState.PLAYING){started=true;if(!ev.target.isMuted())soundBtn.hidden=true}}
+    }});
+};
 if(id){
   document.title=(t||"Clip")+" · IA Learning Path";
   document.getElementById("ttl").textContent=t||"Clip";
   document.getElementById("meta").textContent=(c?c+" · ":"")+"tramo "+fmt(s)+(e>s?" → "+fmt(e):"");
-  document.getElementById("yt").href="https://youtu.be/"+id+"?t="+s;
-  load();
+  document.getElementById("ytl").href="https://youtu.be/"+id+"?t="+s;
+  const tag=document.createElement("script");tag.src="https://www.youtube.com/iframe_api";document.head.appendChild(tag);
 }
-document.getElementById("again").onclick=load;
+soundBtn.onclick=unmute;
+// Cualquier clic o tecla en la página activa el sonido si el vídeo arrancó en silencio.
+document.addEventListener("pointerdown",ev=>{if(!soundBtn.hidden&&ev.target!==soundBtn)unmute()});
+document.addEventListener("keydown",()=>{if(!soundBtn.hidden)unmute()});
+document.getElementById("again").onclick=()=>{play();unmute()};
 document.getElementById("full").onclick=()=>{const b=document.getElementById("box");(b.requestFullscreen||b.webkitRequestFullscreen||function(){}).call(b)};
 window.addEventListener("hashchange",()=>location.reload());
 </script>
