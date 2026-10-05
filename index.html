@@ -48,6 +48,10 @@ const soundBtn=document.getElementById("sound");
 let P=null,started=false;
 function unmute(){if(P&&P.isMuted&&P.isMuted()){P.unMute();P.setVolume(100)}soundBtn.hidden=true}
 function playSound(){if(P){P.unMute();P.setVolume(100);P.playVideo()}soundBtn.hidden=true}
+// En Safari, YouTube pone el anuncio en silencio y el vídeo sigue mudo al terminar.
+// Mientras dura el anuncio y los primeros segundos del clip, se vuelve a activar el sonido.
+let keepSound=true,keepT=0;
+setInterval(()=>{if(keepSound&&P&&P.isMuted&&P.isMuted()){P.unMute();P.setVolume(100)}},600);
 function play(){if(!P)return;P.loadVideoById({videoId:id,startSeconds:s,endSeconds:e>s?e:undefined})}
 window.onYouTubeIframeAPIReady=function(){
   P=new YT.Player("yt",{host:"https://www.youtube-nocookie.com",videoId:id,
@@ -57,7 +61,7 @@ window.onYouTubeIframeAPIReady=function(){
         // Nunca se silencia: un anuncio inicial no avisa de que está reproduciendo y el silencio se quedaba puesto.
         // Si el navegador no deja arrancar solo, aparece el botón para reproducir con sonido.
         setTimeout(()=>{const st=ev.target.getPlayerState();if(!started&&(st===-1||st===5))soundBtn.hidden=false},4000)},
-      onStateChange:ev=>{if(ev.data===YT.PlayerState.PLAYING){started=true;if(!ev.target.isMuted())soundBtn.hidden=true}}
+      onStateChange:ev=>{if(ev.data===YT.PlayerState.PLAYING){started=true;if(!ev.target.isMuted())soundBtn.hidden=true;clearTimeout(keepT);keepT=setTimeout(()=>{if(P&&!P.isMuted())keepSound=false},8000)}}
     }});
 };
 if(id){
@@ -71,7 +75,7 @@ soundBtn.onclick=playSound;
 // Cualquier clic o tecla en la página activa el sonido si el vídeo arrancó en silencio.
 document.addEventListener("pointerdown",ev=>{if(!soundBtn.hidden&&ev.target!==soundBtn)playSound()});
 document.addEventListener("keydown",()=>{if(!soundBtn.hidden)playSound()});
-document.getElementById("again").onclick=()=>{play();unmute()};
+document.getElementById("again").onclick=()=>{keepSound=true;play();unmute()};
 document.getElementById("full").onclick=()=>{const b=document.getElementById("box");(b.requestFullscreen||b.webkitRequestFullscreen||function(){}).call(b)};
 window.addEventListener("hashchange",()=>location.reload());
 </script>
