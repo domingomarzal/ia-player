@@ -29,7 +29,7 @@ button.pri{background:var(--c);border-color:var(--c);color:#fff}
   <header>
     <div><div class="k" id="meta">IA Learning Path</div><h1 id="ttl">Reproductor de clips</h1></div>
     <div class="act">
-      <button type="button" class="pri" id="sound" hidden>Activar sonido</button>
+      <button type="button" class="pri" id="sound" hidden>Reproducir con sonido</button>
       <button type="button" id="again">Repetir tramo</button>
       <button type="button" id="full">Pantalla completa</button>
       <a class="b" id="ytl" href="#" target="_blank" rel="noopener">Abrir en YouTube</a>
@@ -46,19 +46,17 @@ const t=q.get("t")||"";const c=q.get("c")||"";
 const fmt=x=>{const h=Math.floor(x/3600),m=Math.floor(x%3600/60),r=x%60;return (h?h+":"+String(m).padStart(2,"0"):m)+":"+String(r).padStart(2,"0")};
 const soundBtn=document.getElementById("sound");
 let P=null,started=false;
-// Comprueba si este navegador deja reproducir sonido sin pulsar nada.
-function silentWav(){const n=1600,b=new ArrayBuffer(44+n),d=new DataView(b),w=(o,t)=>{for(let i=0;i<t.length;i++)d.setUint8(o+i,t.charCodeAt(i))};w(0,"RIFF");d.setUint32(4,36+n,true);w(8,"WAVE");w(12,"fmt ");d.setUint32(16,16,true);d.setUint16(20,1,true);d.setUint16(22,1,true);d.setUint32(24,8000,true);d.setUint32(28,8000,true);d.setUint16(32,1,true);d.setUint16(34,8,true);w(36,"data");d.setUint32(40,n,true);for(let i=0;i<n;i++)d.setUint8(44+i,128);return URL.createObjectURL(new Blob([b],{type:"audio/wav"}))}
-const soundOK=new Promise(res=>{try{const a=new Audio(silentWav());a.volume=0.01;const p=a.play();if(p&&p.then){p.then(()=>{a.pause();res(true)},()=>res(false))}else res(true)}catch(_){res(false)}setTimeout(()=>res(false),1500)});
 function unmute(){if(P&&P.isMuted&&P.isMuted()){P.unMute();P.setVolume(100)}soundBtn.hidden=true}
+function playSound(){if(P){P.unMute();P.setVolume(100);P.playVideo()}soundBtn.hidden=true}
 function play(){if(!P)return;P.loadVideoById({videoId:id,startSeconds:s,endSeconds:e>s?e:undefined})}
 window.onYouTubeIframeAPIReady=function(){
   P=new YT.Player("yt",{host:"https://www.youtube-nocookie.com",videoId:id,
     playerVars:{autoplay:1,start:s,end:e>s?e:undefined,rel:0,modestbranding:1,playsinline:1,origin:location.origin},
     events:{
       onReady:ev=>{ev.target.playVideo();
-        // Solo si el navegador bloquea el sonido: empieza en silencio y deja el botón para activarlo.
-        // Si el sonido está permitido no se silencia nunca (un anuncio inicial no avisa de que está reproduciendo).
-        soundOK.then(ok=>{if(ok)return;setTimeout(()=>{const st=ev.target.getPlayerState();if(!started&&(st===-1||st===5)){ev.target.mute();ev.target.playVideo();soundBtn.hidden=false}},2500)})},
+        // Nunca se silencia: un anuncio inicial no avisa de que está reproduciendo y el silencio se quedaba puesto.
+        // Si el navegador no deja arrancar solo, aparece el botón para reproducir con sonido.
+        setTimeout(()=>{const st=ev.target.getPlayerState();if(!started&&(st===-1||st===5))soundBtn.hidden=false},4000)},
       onStateChange:ev=>{if(ev.data===YT.PlayerState.PLAYING){started=true;if(!ev.target.isMuted())soundBtn.hidden=true}}
     }});
 };
@@ -69,10 +67,10 @@ if(id){
   document.getElementById("ytl").href="https://youtu.be/"+id+"?t="+s;
   const tag=document.createElement("script");tag.src="https://www.youtube.com/iframe_api";document.head.appendChild(tag);
 }
-soundBtn.onclick=unmute;
+soundBtn.onclick=playSound;
 // Cualquier clic o tecla en la página activa el sonido si el vídeo arrancó en silencio.
-document.addEventListener("pointerdown",ev=>{if(!soundBtn.hidden&&ev.target!==soundBtn)unmute()});
-document.addEventListener("keydown",()=>{if(!soundBtn.hidden)unmute()});
+document.addEventListener("pointerdown",ev=>{if(!soundBtn.hidden&&ev.target!==soundBtn)playSound()});
+document.addEventListener("keydown",()=>{if(!soundBtn.hidden)playSound()});
 document.getElementById("again").onclick=()=>{play();unmute()};
 document.getElementById("full").onclick=()=>{const b=document.getElementById("box");(b.requestFullscreen||b.webkitRequestFullscreen||function(){}).call(b)};
 window.addEventListener("hashchange",()=>location.reload());
